@@ -11,6 +11,7 @@ from app.repositories.token_repo import (
     get_refresh_token,
     delete_refresh_token,
 )
+from fastapi import HTTPException
 
 # Environment variables
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -21,7 +22,41 @@ BACKEND_URL = os.getenv("BACKEND_URL")
 state_store = {}
 
 
-def login_or_create_user(db: Session, user_info: dict, role: str, company_id: int = None) -> dict:
+def autheticate(db: Session, user_info: dict, role: str | None = None):
+    """
+    Authenticates a user with Google OAuth and creates/updates their record.
+    
+    Args:
+        db (Session): SQLAlchemy database session.
+        user_info (dict): User information from Google OAuth.
+        role (str | None): Role to assign to the user.
+        company_id (int): Company ID for recruiter users.
+    
+    Returns:
+        dict: Contains 'user', 'access_token', and 'refresh_token'.
+    """
+    # Check if user already exists
+    user = db.query(User).filter(User.email == user_info["email"]).first()
+    message = None
+
+    if user:
+        if user.role:
+            # Only warn if user is TRYING to change role
+            if role is not None and role != user.role:
+                message = "Role already assigned. Please update it in settings."
+
+        elif role:
+            user.role = role
+            db.commit()
+
+    else:
+        role = role if role is not None else "candidate"
+    
+    return login_or_create_user(db, user_info, role, message , user)
+
+
+        
+def login_or_create_user(db: Session, user_info: dict, role: str | None = None, message: str = None , user: User = None) -> dict:
     """
     Logs in an existing user or creates a new one if they do not exist.
 
@@ -35,12 +70,6 @@ def login_or_create_user(db: Session, user_info: dict, role: str, company_id: in
     Returns:
         dict: Contains 'user', 'access_token', and 'refresh_token'.
     """
-    # Check if user already exists
-    user = db.query(User).filter(User.email == user_info["email"]).first()
-
-    if user:
-        user.role = role  # Update role if user already exists
-        db.commit()
 
     # Create user if not exists
     if not user:
@@ -83,12 +112,12 @@ def login_or_create_user(db: Session, user_info: dict, role: str, company_id: in
     access_token = create_jwt(user.user_id, user.role, expires_minutes=60)
 
     # Create refresh token using repository
-    refresh_token_obj = create_refresh_token(db, user.user_id)
+    create_refresh_token(db, user.user_id)
 
     return {
         "user": user,
         "access_token": access_token,
-        "refresh_token": refresh_token_obj.token,
+        "message": message,
     }
 
 

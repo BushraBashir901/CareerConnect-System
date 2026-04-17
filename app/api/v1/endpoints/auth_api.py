@@ -6,7 +6,7 @@ from app.core.security import SECRET_KEY
 from app.models.user import User
 from app.schemas.token_schema import TokenSchema, RefreshTokenRequest
 from app.services.auth_service import (
-    login_or_create_user,
+    autheticate,
     refresh_access_token,
     logout_user,
 )
@@ -27,7 +27,7 @@ BACKEND_URL = os.getenv("BACKEND_URL")
 
 @router.get("/login/google")
 def google_login(
-    role: str = Query("candidate"),
+    role: str | None = Query(),
 ):
     """
     Initiate Google OAuth login flow.
@@ -102,8 +102,7 @@ def google_callback(
         raise HTTPException(status_code=400, detail="Failed to get access token")
 
     user_data = get_user_info(access_token)
-
-    auth_result = login_or_create_user(db, user_data, role)
+    auth_result = autheticate(db, user_data, role)
 
     return JSONResponse(content={
         "user": {
@@ -115,7 +114,8 @@ def google_callback(
             "is_active": auth_result["user"].is_active
         },
         "access_token": auth_result["access_token"],
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "message": auth_result.get("message", "")
     })
 
 

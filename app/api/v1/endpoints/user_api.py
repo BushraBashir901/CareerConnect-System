@@ -1,11 +1,15 @@
-from fastapi import Depends, APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.core.dependency import get_db
 from app.dependencies.rbac_strict import get_current_user, require_permission_with_company_scope
 from app.core.rbac import PermissionEnum
 from app.models.user import User
+from app.models.user_resume import UserResume
 from app.repositories import user_repo
 from app.schemas.user import UserUpdate, UserResponse
+from app.utils.file_validator import validate_file
+from app.utils.parser import parse_data, extract_text
+import os
 
 
 router = APIRouter(prefix="/user", tags=["Users"])
@@ -164,3 +168,64 @@ def get_current_user_profile(
         UserResponse: Current user profile.
     """
     return current_user
+
+#-------------------------------------------------------#
+# Resume Endpoints
+#-------------------------------------------------------#
+
+@router.post("/resume", response_model=dict)
+def upload_resume(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a resume file.
+    
+    Args:
+        file (UploadFile): Resume file to upload.
+        current_user (User): Authenticated user.
+    
+    Returns:
+        dict: Upload success message.
+    """
+    try:
+        validate_file(file)
+        
+        os.makedirs("uploads",exist_ok=True)
+        
+        file_path=f"uploads/{file.filename}"
+        
+        with open(file_path,"wb") as f:
+            f.write(file.file.read())
+            text = extract_text(file_path)
+
+        # 5. Parse data
+        parsed_data = parse_data(text)
+
+        # 6. Save to DB
+        user_resume = UserResume(
+            user_id=current_user.user_id,
+            raw_text=text,
+            clear_text=parsed_data
+        )
+        db.add(user_resume)
+        db.commit()
+        db.refresh(user_resume)
+
+        return {
+            "message": "Uploaded successfully",
+            "file_path": file_path,
+            "parsed_data": parsed_data,
+            "resume_id": user_resume.user_resume_id
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@router.get("/{user_id}")
+async def get_resumes(user_id: str):
+    return {"message": "Get resumes"}
+    

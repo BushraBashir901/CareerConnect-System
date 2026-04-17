@@ -1,20 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from datetime import datetime
+from task.send_email_invitation_task import send_team_invitation_email
+
 
 from app.core.dependency import get_db
 from app.dependencies.rbac_strict import require_permission_with_company_scope
 from app.core.rbac import PermissionEnum
-from app.models.user import User
 from app.models.company import Company
 from app.repositories import team_invitation_repo, company_repo
 from app.schemas.team_invitation import (
     TeamInvitationCreate, TeamInvitationResponse, 
     InvitationAcceptResponse
 )
-from app.services.email_service import email_service
 from app.schemas.pagination import PaginationParams, PaginatedResponse
-from app.utils.pagination import paginate_query, create_paginated_response
+from app.utils.pagination import create_paginated_response
 
 router = APIRouter(
     prefix="/team-invitations",
@@ -62,18 +61,14 @@ def send_team_invitation(
     
     team_invitation = team_invitation_repo.create_team_invitation(db, invitation_data)
     
-    # Send email invitation
-    email_sent = email_service.send_team_invitation(
+    # Send email invitation asynchronously->background task
+    send_team_invitation_email.delay(
         to_email=invitation.invited_email,
         inviter_name=current_user.username,
         company_name=company.company_name,
         invitation_id=team_invitation.invitation_id,
         expires_at=team_invitation.expires_at
     )
-    
-    if not email_sent:
-        # Log email failure instead of printing
-        print(f"Failed to send invitation email to {invitation.invited_email}")
     
     return team_invitation
 

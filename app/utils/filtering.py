@@ -1,5 +1,5 @@
 from typing import Optional, List, Any, Dict
-from sqlalchemy import and_, or_, func
+from sqlalchemy import  or_
 from sqlalchemy.orm import Query
 from datetime import datetime, date
 import re
