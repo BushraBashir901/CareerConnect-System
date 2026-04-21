@@ -1,9 +1,14 @@
 from pypdf import PdfReader
-try:
-    from docx import Document
-except ImportError:
-    Document = None
+from docx import Document
 import re
+
+
+# from pypdf import PdfReader
+# try:
+#     from docx import Document
+# except ImportError:
+#     Document = None
+# import re
 
 
 def extract_text(file_path: str) -> str:
