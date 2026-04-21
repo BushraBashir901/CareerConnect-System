@@ -17,6 +17,8 @@ class UserResume(Base):
     # Resume Data
     raw_text = Column(String, nullable=False)
     clear_text = Column(JSONB, nullable=False)
+    file_path = Column(String, nullable=True)
+    filename = Column(String, nullable=True)
 
     # Relationship
     user = relationship("User", back_populates="user_resume")

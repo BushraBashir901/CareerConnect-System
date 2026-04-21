@@ -1,8 +1,10 @@
 from app.services.email_service import email_service
 from datetime import datetime
-from celery_config import app
+from celery_worker import celery_app
+import dotenv
+dotenv.load_dotenv()
 
-@app.task(name="send_team_invitation_email")
+@celery_app.task(name="send_team_invitation_email")
 def send_team_invitation_email(to_email: str, inviter_name: str, company_name: str, invitation_id: str, expires_at: datetime):
     """
     Send team invitation email asynchronously.

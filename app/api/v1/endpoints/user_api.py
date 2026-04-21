@@ -9,10 +9,12 @@ from app.repositories import user_repo
 from app.schemas.user import UserUpdate, UserResponse
 from app.utils.file_validator import validate_file
 from app.utils.parser import parse_data, extract_text
+from task.cv_parsing_task import parse_cv_resume
+from celery.result import AsyncResult
 import os
 
 
-router = APIRouter(prefix="/user", tags=["Users"])
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 # ========== USER MANAGEMENT ENDPOINTS ==========
@@ -180,52 +182,141 @@ def upload_resume(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a resume file.
+    Upload a resume file and parse it in background.
     
     Args:
         file (UploadFile): Resume file to upload.
         current_user (User): Authenticated user.
     
     Returns:
-        dict: Upload success message.
+        dict: Task ID to check results later.
     """
     try:
+        # Validate the file
         validate_file(file)
         
-        os.makedirs("uploads",exist_ok=True)
+        # Create uploads folder if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
         
-        file_path=f"uploads/{file.filename}"
-        
-        with open(file_path,"wb") as f:
+        # Save the file
+        file_path = f"uploads/{file.filename}"
+        with open(file_path, "wb") as f:
             f.write(file.file.read())
-            text = extract_text(file_path)
-
-        # 5. Parse data
-        parsed_data = parse_data(text)
-
-        # 6. Save to DB
-        user_resume = UserResume(
-            user_id=current_user.user_id,
-            raw_text=text,
-            clear_text=parsed_data
+        # Submit CV parsing task to Celery with apply_async
+        from task.cv_parsing_task import parse_cv_resume
+        
+        task = parse_cv_resume.apply_async(
+            args=[file_path],
+            expires=600,  # Task expires after 10 minutes
+            retry=True,   # Retry on failure
+            queue='cv_processing'
         )
-        db.add(user_resume)
-        db.commit()
-        db.refresh(user_resume)
-
+        
         return {
-            "message": "Uploaded successfully",
-            "file_path": file_path,
-            "parsed_data": parsed_data,
-            "resume_id": user_resume.user_resume_id
+            "message": "File uploaded and sent for parsing!",
+            "task_id": task.id,
+            "file": file.filename,
+            "status": "processing"
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        print(f"Error in upload_resume: {e}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
+@router.get("/resume/status/{task_id}")
+def get_resume_status(task_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Check the status of CV parsing task.
+    
+    Args:
+        task_id (str): Celery task ID
+        current_user (User): Authenticated user
+    
+    Returns:
+        dict: Task status and results
+    """
+    try:
+        from task.cv_parsing_task import parse_cv_resume
+        
+        task = parse_cv_resume.AsyncResult(task_id)
+        
+        if task.state == 'PENDING':
+            response = {
+                'state': task.state,
+                'status': 'Task is waiting to be processed'
+            }
+        elif task.state == 'PROGRESS':
+            response = {
+                'state': task.state,
+                'status': 'Task is in progress'
+            }
+        elif task.state == 'SUCCESS':
+            response = {
+                'state': task.state,
+                'result': task.result
+            }
+        else:  # FAILURE
+            response = {
+                'state': task.state,
+                'error': str(task.info)
+            }
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
+
+    
 
 @router.get("/{user_id}")
 async def get_resumes(user_id: str):
     return {"message": "Get resumes"}
+
+# @router.get("/resume/task/{task_id}")
+# def get_parsing_task_status(
+#     task_id: str,
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Check if CV parsing is done.
+    
+#     Args:
+#         task_id (str): Task ID from upload response
+#         current_user (User): Authenticated user
+    
+#     Returns:
+#         dict: Task status and results
+#     """
+#     try:
+#         # Get task result
+#         result = AsyncResult(task_id)
+        
+#         # Check if task is finished
+#         if result.ready():
+#             if result.successful():
+#                 # Task completed successfully
+#                 return {
+#                     "status": "completed",
+#                     "result": result.get()
+#                 }
+#             else:
+#                 # Task failed
+#                 return {
+#                     "status": "failed",
+#                     "error": str(result.info)
+#                 }
+#         else:
+#             # Task still running
+#             return {
+#                 "status": "processing",
+#                 "message": "Still parsing your CV..."
+#             }
+        
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
     
