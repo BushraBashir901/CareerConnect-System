@@ -6,17 +6,18 @@ from app.models.refresh_token import RefreshToken
 from app.models.company import Company
 from app.core.rbac import RoleEnum
 from app.core.security import create_jwt
+from app.core.config import settings
+from fastapi import HTTPException
 from app.repositories.token_repo import (
     create_refresh_token,
     get_refresh_token,
     delete_refresh_token,
 )
-from fastapi import HTTPException
 
-# Environment variables
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-BACKEND_URL = os.getenv("BACKEND_URL")
+
+GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
+BACKEND_URL = settings.BACKEND_URL
 
 # Temporary state store (replace with Redis for production)
 state_store = {}
@@ -37,7 +38,7 @@ def autheticate(db: Session, user_info: dict, role: str | None = None):
     """
     # Check if user already exists
     user = db.query(User).filter(User.email == user_info["email"]).first()
-    message = None
+    message = {"Gmail already exist"}
 
     if user:
         if user.role:
@@ -81,9 +82,7 @@ def login_or_create_user(db: Session, user_info: dict, role: str | None = None, 
             company_name = f"{user_info.get('name', 'Unknown')}'s Company"
             new_company = Company(
                 company_name=company_name,
-                description=f"Company for {user_info.get('name', 'Unknown')}",
-                location="Not specified",
-                industry="Not specified"
+                description=f"Company for {user_info.get('name', 'Unknown')}"
             )
             db.add(new_company)
             db.commit()
@@ -99,9 +98,9 @@ def login_or_create_user(db: Session, user_info: dict, role: str | None = None, 
         user = User(
             username=user_info.get("name"),
             email=user_info["email"],
-            google_id=user_info.get("id"),  # or "sub"
-            role=role,  # Use the role passed to the function
-            company_id=user_company_id,  # Assign company_id for recruiters only
+            google_id=user_info.get("id"), 
+            role=role,  
+            company_id=user_company_id, 
             is_active=True,
         )
         db.add(user)

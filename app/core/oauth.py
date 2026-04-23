@@ -2,12 +2,12 @@ import secrets
 import os
 import requests
 from app.core.security import create_jwt
-
+from app.core.config import settings
 
 # Environment variables
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-BACKEND_URL = os.getenv("BACKEND_URL")
+GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
+BACKEND_URL = settings.BACKEND_URL
 
 # Temporary state store (replace with Redis for production)
 state_store = {}

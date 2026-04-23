@@ -192,25 +192,23 @@ def upload_resume(
         dict: Task ID to check results later.
     """
     try:
-        # Validate the file
         validate_file(file)
-        
-        # Create uploads folder if it doesn't exist
         os.makedirs("uploads", exist_ok=True)
-        
-        # Save the file
         file_path = f"uploads/{file.filename}"
         with open(file_path, "wb") as f:
             f.write(file.file.read())
         # Submit CV parsing task to Celery with apply_async
+        print(f"Submitting Celery task for file: {file_path}, user: {current_user.user_id}")
         from task.cv_parsing_task import parse_cv_resume
         
         task = parse_cv_resume.apply_async(
-            args=[file_path],
-            expires=600,  # Task expires after 10 minutes
-            retry=True,   # Retry on failure
+            args=[file_path , current_user.user_id],
+            expires=600, 
+            retry=True,   
             queue='cv_processing'
         )
+        
+        print(f"Celery task submitted with ID: {task.id}")
         
         return {
             "message": "File uploaded and sent for parsing!",

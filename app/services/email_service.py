@@ -4,8 +4,7 @@ from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
-load_dotenv()
+from app.core.config import settings
 
 class EmailService:
     """
@@ -15,12 +14,12 @@ class EmailService:
     """
     
     def __init__(self):
-        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_username = os.getenv("SMTP_USERNAME", "bushrabashir396@gmail.com")
-        self.smtp_password = os.getenv("SMTP_PASSWORD", "zsjjptsjscmsrwql")
-        self.from_email = os.getenv("FROM_EMAIL", "bushrabashir396@gmail.com")
-        self.app_base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+        self.smtp_server = settings.SMTP_SERVER
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_username = settings.SMTP_USERNAME
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.from_email = settings.FROM_EMAIL
+        self.app_base_url = settings.APP_BASE_URL
     
     def send_team_invitation(
         self,

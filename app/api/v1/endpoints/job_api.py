@@ -2,20 +2,37 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
+from app.models.user import User
 from app.core.dependency import get_db
+from app.core.rbac import PermissionEnum, RoleEnum
 from app.dependencies.rbac_strict import (
     require_permission_with_company_scope, 
     require_company_ownership, 
     require_admin_or_company_owner
 )
-from app.core.rbac import PermissionEnum, RoleEnum
-from app.models.user import User
-from app.repositories import job_repo, company_repo
-from app.schemas.job import JobCreate, JobUpdate, JobResponse
-from app.schemas.pagination import PaginationParams, PaginatedResponse
-from app.utils.pagination import paginate_query, create_paginated_response
-from app.utils.filtering import JobFilterParams, apply_job_filters
+from app.repositories import (
+    job_repo, 
+    company_repo
+)
+from app.schemas.job import (
+    JobCreate, 
+    JobUpdate, 
+    JobResponse
+)
+from app.schemas.pagination import(
+    PaginationParams,
+    PaginatedResponse
+)
+from app.utils.pagination import(
+     paginate_query, 
+     create_paginated_response
+)
+from app.utils.filtering import(
+    JobFilterParams, 
+    apply_job_filters
+)
+
+
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -236,3 +253,4 @@ def delete_job(
         return job
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+

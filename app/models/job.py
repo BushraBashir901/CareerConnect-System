@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey,Boole
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
+from pgvector.sqlalchemy import Vector
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -17,6 +18,9 @@ class Job(Base):
     job_type = Column(String(50), nullable=True)  # full-time, part-time, contract
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
+    
+    # Vector embedding for semantic search (384 dimensions for sentence-transformers)
+    embedding = Column(Vector(384), nullable=True)
     
     #foreign key to companies table
     company_id = Column(Integer, ForeignKey('companies.company_id'), nullable=False)

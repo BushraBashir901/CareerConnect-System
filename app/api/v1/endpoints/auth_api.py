@@ -18,11 +18,12 @@ from app.core.oauth import (
     get_user_info
 )
 from app.core.dependency import get_db
+from app.core.config import settings
 
 import os
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-BACKEND_URL = os.getenv("BACKEND_URL")
+BACKEND_URL = settings.BACKEND_URL
 
 
 @router.get("/login/google")
@@ -53,12 +54,14 @@ def google_login(
 
     google_auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"response_type=code&client_id={os.getenv('GOOGLE_CLIENT_ID')}&"
+        f"response_type=code&client_id={settings.GOOGLE_CLIENT_ID}&"
         f"redirect_uri={BACKEND_URL}/auth/google/callback&"
         f"scope=openid email profile&state={state}"
     )
 
     return JSONResponse(content={"url": google_auth_url})
+    
+    #return RedirectResponse(url=google_auth_url)
 
 
 @router.get("/google/callback")
@@ -67,23 +70,6 @@ def google_callback(
     state: str = Query(None, description="CSRF state token"),
     db: Session = Depends(get_db)
 ):
-    """
-    Handle Google OAuth callback.
-
-    Exchanges authorization code for access token, fetches user info,
-    and logs in or creates the user.
-
-    Args:
-        code (str): Authorization code from Google.
-        state (str): CSRF state token.
-        db (Session): Database session.
-
-    Returns:
-        JSONResponse: User data and JWT tokens.
-
-    Raises:
-        HTTPException: If authentication fails.
-    """
     state_data = verify_state(state)
     if not state_data:
         raise HTTPException(status_code=400, detail="Invalid state token")
@@ -104,21 +90,32 @@ def google_callback(
     user_data = get_user_info(access_token)
     auth_result = autheticate(db, user_data, role)
 
+    user = auth_result["user"]
+
+    safe_role = (
+        list(user.role)[0] if isinstance(user.role, set) else user.role
+    )
+
+    safe_message = (
+        list(auth_result.get("message"))[0]
+        if isinstance(auth_result.get("message"), set)
+        else auth_result.get("message", "")
+    )
+
     return JSONResponse(content={
         "user": {
-            "id": auth_result["user"].user_id,
-            "username": auth_result["user"].username,
-            "email": auth_result["user"].email,
-            "role": auth_result["user"].role,
-            "google_id": auth_result["user"].google_id,
-            "is_active": auth_result["user"].is_active
+            "id": user.user_id,
+            "username": user.username,
+            "email": user.email,
+            "role": safe_role,  
+            "google_id": user.google_id,
+            "is_active": user.is_active
         },
         "access_token": auth_result["access_token"],
         "token_type": "bearer",
-        "message": auth_result.get("message", "")
+        "message": safe_message  
     })
-
-
+    
 @router.post("/refresh", response_model=TokenSchema)
 def refresh_token(
     token_request: RefreshTokenRequest,

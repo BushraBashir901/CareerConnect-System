@@ -2,16 +2,12 @@ import bcrypt
 import hashlib
 from datetime import datetime, timedelta
 from jose import jwt
-import os
-from dotenv import load_dotenv
+from app.core.config import settings
 
-load_dotenv()
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-
-
-# 🔐 HASH PASSWORD
+# HASH PASSWORD
 def hash_password(password: str) -> str:
     sha256_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
     salt = bcrypt.gensalt()

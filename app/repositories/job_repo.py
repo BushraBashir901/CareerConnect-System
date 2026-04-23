@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.job import Job
 from app.models.company import Company
 from app.schemas.job import JobCreate, JobUpdate
+from app.services.embeddings_service import generate_embedding
 
 
 def create_job(db: Session, job_data: JobCreate, company_id: int) -> Job:
@@ -9,7 +10,6 @@ def create_job(db: Session, job_data: JobCreate, company_id: int) -> Job:
     Create a new job in the database after validating the company exists.
     """
 
-    # ✅ Validate company exists
     company = db.query(Company).filter(
         Company.company_id == company_id
     ).first()
@@ -17,17 +17,20 @@ def create_job(db: Session, job_data: JobCreate, company_id: int) -> Job:
     if not company:
         raise ValueError(f"Company with id {company_id} not found")
 
-   
-    # ✅ Create job
+    # Generate embedding from job description
+    embedding = generate_embedding(job_data.job_description)
+
     db_job = Job(
         **job_data.dict(),
-        company_id=company_id
+        company_id=company_id,
+        embedding=embedding
     )
 
     db.add(db_job)
     db.commit()
     db.refresh(db_job)
     return db_job
+
 
 def get_job(db: Session, job_id: int) -> Job | None:
     """
