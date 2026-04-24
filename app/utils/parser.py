@@ -12,6 +12,23 @@ import re
 
 
 def extract_text(file_path: str) -> str:
+    """
+    Extract text content from PDF and DOCX files.
+    
+    Supports PDF files using pypdf and DOCX files using python-docx.
+    Returns empty string for unsupported file formats.
+    
+    Args:
+        file_path: Path to the file to extract text from
+        
+    Returns:
+        str: Extracted text content, or empty string if extraction fails
+        
+    Note:
+        - PDF: Extracts text from all pages
+        - DOCX: Extracts text from all paragraphs
+        - Other formats: Returns empty string
+    """
     if file_path.endswith(".pdf"):
         reader = PdfReader(file_path)
         text = ""
@@ -30,6 +47,24 @@ def extract_text(file_path: str) -> str:
         return ""
     
 def parse_data(text):
+    """
+    Parse resume text to extract email and skills information.
+    
+    Uses regex patterns to find email addresses and searches for
+    predefined skills in the text.
+    
+    Args:
+        text: Resume text content to parse
+        
+    Returns:
+        dict: Dictionary containing:
+            - email: First found email address or None
+            - skills: List of found skills from predefined list
+            
+    Note:
+        Currently searches for: python, django, ml, fastapi
+        Skills matching is case-insensitive
+    """
     email = re.findall(r"[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+", text)
     
     skills_list = ["python", "django", "ml", "fastapi"]

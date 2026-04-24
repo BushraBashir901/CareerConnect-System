@@ -31,5 +31,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     FROM_EMAIL: str
     APP_BASE_URL: str
+    
+    # Ollama Configuration
+    OLLAMA_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "phi3"
 
 settings = Settings()

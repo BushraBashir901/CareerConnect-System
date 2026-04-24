@@ -1,0 +1,24 @@
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.base_class import Base
+
+class ChatbotConversation(Base):
+    __tablename__ = "chatbot_conversations"
+
+    conversation_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    
+    # Message content
+    message_type = Column(String(50), nullable=False)  # 'user', 'bot', 'system'
+    content = Column(Text, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Optional metadata
+    session_id = Column(String(255), nullable=True)  # Group messages by session
+    conservation_metadata = Column(Text, nullable=True)  # JSON for additional context
+
+    user = relationship("User", back_populates="chatbot_conversations")
+

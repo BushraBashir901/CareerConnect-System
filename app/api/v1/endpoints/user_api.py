@@ -4,13 +4,9 @@ from app.core.dependency import get_db
 from app.dependencies.rbac_strict import get_current_user, require_permission_with_company_scope
 from app.core.rbac import PermissionEnum
 from app.models.user import User
-from app.models.user_resume import UserResume
 from app.repositories import user_repo
 from app.schemas.user import UserUpdate, UserResponse
 from app.utils.file_validator import validate_file
-from app.utils.parser import parse_data, extract_text
-from task.cv_parsing_task import parse_cv_resume
-from celery.result import AsyncResult
 import os
 
 

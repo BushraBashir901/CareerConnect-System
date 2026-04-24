@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
-from app.models.user_resume import UserResume
+
 
 
 class User(Base):
@@ -34,5 +34,7 @@ class User(Base):
     interviews = relationship("Interview", back_populates="user")
     refresh_tokens = relationship("RefreshToken", back_populates="user")
 
-    # ✅ One-to-One relationship with resume
+    # One-to-One relationship with resume
+    chatbot_conversations = relationship("ChatbotConversation", back_populates="user")
+
     user_resume = relationship("UserResume", back_populates="user", uselist=False)

@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-
-from app.core.security import SECRET_KEY
 from app.models.user import User
 from app.schemas.token_schema import TokenSchema, RefreshTokenRequest
 from app.services.auth_service import (
@@ -20,7 +18,6 @@ from app.core.oauth import (
 from app.core.dependency import get_db
 from app.core.config import settings
 
-import os
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 BACKEND_URL = settings.BACKEND_URL
@@ -70,6 +67,23 @@ def google_callback(
     state: str = Query(None, description="CSRF state token"),
     db: Session = Depends(get_db)
 ):
+    """
+    Handle Google OAuth callback and authenticate user.
+    
+    Exchanges authorization code for access token, retrieves user info,
+    and authenticates/creates user in the system.
+    
+    Args:
+        code: Authorization code received from Google OAuth
+        state: CSRF state token for security validation
+        db: Database session dependency
+        
+    Returns:
+        JSONResponse: User data with access tokens and role information
+        
+    Raises:
+        HTTPException: If state token invalid, code missing, or token exchange fails
+    """
     state_data = verify_state(state)
     if not state_data:
         raise HTTPException(status_code=400, detail="Invalid state token")
@@ -115,7 +129,7 @@ def google_callback(
         "token_type": "bearer",
         "message": safe_message  
     })
-    
+
 @router.post("/refresh", response_model=TokenSchema)
 def refresh_token(
     token_request: RefreshTokenRequest,

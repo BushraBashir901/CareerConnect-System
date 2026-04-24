@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.core.dependency import get_db
 from app.dependencies.rbac_strict import require_permission_with_company_scope, require_company_ownership, require_admin_or_company_owner
 from app.core.rbac import PermissionEnum
-from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyUpdate, CompanyResponse
 from app.repositories import company_repo
 
