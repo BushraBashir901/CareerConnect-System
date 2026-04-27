@@ -2,6 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.db.session import SessionLocal
 from app.services.chatbot_service import CareerConnectChatbot
 from typing import Optional
+import uuid
 
 router = APIRouter()
 
@@ -43,7 +44,6 @@ async def chat_socket(
         
         # Generate session ID if not provided
         if not session_id:
-            import uuid
             session_id = str(uuid.uuid4())
         
         # Send welcome message

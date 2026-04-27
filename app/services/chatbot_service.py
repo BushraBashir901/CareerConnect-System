@@ -44,12 +44,11 @@ class CareerConnectChatbot:
             - Job search functionality requires database session
         """
 
-        ollama_url = getattr(settings, "OLLAMA_URL", "http://localhost:11434/v1")
+        ollama_url = settings.OLLAMA_URL
+        model_name = settings.OLLAMA_MODEL
 
-        model_name = getattr(settings, "OLLAMA_MODEL", "gemma2:2b")
-
-        print("Using Ollama model:", model_name)
-        print("Ollama URL:", ollama_url)
+        print(f"Using Ollama model: {model_name}")
+        print(f"Ollama URL: {ollama_url}")
 
         provider = OllamaProvider(base_url=ollama_url)
 
@@ -57,7 +56,7 @@ class CareerConnectChatbot:
             model_name=model_name,
             provider=provider
         )
-
+        # Initialize job search service if database session is provided
         job_search_service = JobSearchService(db) if db else None
 
         self.job_search_tool = JobSearchTool(job_search_service) if job_search_service else None
@@ -126,7 +125,7 @@ class CareerConnectChatbot:
             
         Returns:
             str: AI-generated response for general conversation
-            
+        
         Raises:
             Exception: If agent fails to generate response (returns error message)
         """

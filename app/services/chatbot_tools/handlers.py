@@ -14,6 +14,14 @@ class ChatbotHandlers:
                  job_search_tool: Optional[JobSearchTool] = None,
                  career_advice_tool: Optional[CareerAdviceTool] = None,
                  interview_tool: Optional[InterviewPreparationTool] = None):
+        """
+        Initialize chatbot handlers with optional tools.
+        
+        Args:
+            job_search_tool: Optional job search tool instance
+            career_advice_tool: Optional career advice tool instance
+            interview_tool: Optional interview preparation tool instance
+        """
         self.job_search_tool = job_search_tool
         self.career_advice_tool = career_advice_tool
         self.interview_tool = interview_tool

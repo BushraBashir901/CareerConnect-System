@@ -165,18 +165,18 @@ def format_job_results(result: Dict[str, Any]) -> str:
     
     for i, job in enumerate(result["jobs"], 1):
         response += f"**{i}. {job['job_title']} at {job['company_name']}**\n"
-        response += f"📍 {job['location']}\n"
+        response += f"{job['location']}\n"
         
         if job.get('job_type'):
-            response += f"💼 {job['job_type']}\n"
+            response += f"{job['job_type']}\n"
         
         if job.get('salary_range'):
-            response += f"💰 {job['salary_range']}\n"
+            response += f"{job['salary_range']}\n"
         
         # Truncate description for readability
         description = job['job_description'][:200] + "..." if len(job['job_description']) > 200 else job['job_description']
-        response += f"📝 {description}\n"
-        response += f"🎯 Match: {job['similarity_score']:.1%}\n\n"
+        response += f"{description}\n"
+        response += f"Match: {job['similarity_score']:.1%}\n\n"
     
     response += "Would you like me to search for more specific roles or help you prepare for applying to any of these positions?"
     

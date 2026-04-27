@@ -5,33 +5,9 @@ from app.core.dependency import get_db
 from app.services.conversation_service import ConversationService
 from app.dependencies.rbac_strict import get_current_user
 from app.models.user import User
-from pydantic import BaseModel
+from app.schemas.conversation import ConversationMessage, ConversationSession, ConversationStats
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
-
-# Pydantic models for API responses
-class ConversationMessage(BaseModel):
-    """Model for individual conversation message responses."""
-    conversation_id: int
-    message_type: str
-    content: str
-    created_at: str
-    session_id: Optional[str] = None
-
-class ConversationSession(BaseModel):
-    """Model for conversation session summary responses."""
-    session_id: str
-    last_message: str
-    last_message_time: str
-    last_message_type: str
-
-class ConversationStats(BaseModel):
-    """Model for conversation statistics responses."""
-    total_messages: int
-    total_sessions: int
-    user_messages: int
-    bot_messages: int
-    system_messages: int
 
 @router.get("/history", response_model=List[ConversationMessage])
 async def get_conversation_history(
