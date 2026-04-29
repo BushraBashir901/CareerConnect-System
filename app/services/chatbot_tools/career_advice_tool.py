@@ -1,17 +1,12 @@
 from typing import Optional
-from pydantic_ai import Agent
-from pydantic_ai.models.ollama import OllamaModel
+from app.core.llm_client import client
 from app.services.chatbot_tools.prompts import CAREER_ADVICE_PROMPT, INTERVIEW_PREPARATION_PROMPT
 
 class CareerAdviceTool:
     """Chatbot tool for providing career guidance and advice"""
     
-    def __init__(self, model: OllamaModel):
-        self.model = model
-        self.agent = Agent(
-            model=model,
-            system_prompt=CAREER_ADVICE_PROMPT
-        )
+    def __init__(self):
+        self.client = client
     
     async def get_career_advice(self, field: str, experience_level: str, specific_context: Optional[str] = None) -> str:
         """
@@ -31,8 +26,16 @@ class CareerAdviceTool:
             prompt += f" Additional context: {specific_context}"
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": CAREER_ADVICE_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating career advice: {str(e)}"
     
@@ -53,8 +56,16 @@ class CareerAdviceTool:
             prompt = f"What skills should someone in {current_role} focus on developing for career growth?"
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": CAREER_ADVICE_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating skill recommendations: {str(e)}"
     
@@ -71,20 +82,24 @@ class CareerAdviceTool:
         prompt = f"Provide current insights, trends, and future outlook for the {industry} industry. Include job market conditions, emerging opportunities, and key challenges."
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": CAREER_ADVICE_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating industry insights: {str(e)}"
 
 class InterviewPreparationTool:
     """Chatbot tool for interview preparation"""
     
-    def __init__(self, model: OllamaModel):
-        self.model = model
-        self.agent = Agent(
-            model=model,
-            system_prompt=INTERVIEW_PREPARATION_PROMPT
-        )
+    def __init__(self):
+        self.client = client
     
     async def get_interview_tips(self, job_title: str, company_type: Optional[str] = None, interview_type: Optional[str] = None) -> str:
         """
@@ -107,8 +122,16 @@ class InterviewPreparationTool:
             prompt += f" Focus on {interview_type} interview preparation."
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": INTERVIEW_PREPARATION_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating interview tips: {str(e)}"
     
@@ -125,8 +148,16 @@ class InterviewPreparationTool:
         prompt = f"What are the most common interview questions for a {job_title} position? Include both technical and behavioral questions, and provide guidance on how to answer them effectively."
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": INTERVIEW_PREPARATION_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating interview questions: {str(e)}"
     
@@ -144,7 +175,15 @@ class InterviewPreparationTool:
         prompt = f"Provide salary negotiation tips and strategies for a {experience_level} {job_title} position. Include research methods, negotiation techniques, and common pitfalls to avoid."
         
         try:
-            result = await self.agent.run(prompt)
-            return result.output
+            messages = [
+                {"role": "system", "content": INTERVIEW_PREPARATION_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
             return f"I encountered an error while generating salary negotiation tips: {str(e)}"

@@ -8,7 +8,6 @@ from app.core.security import decode_jwt
 # Security scheme
 security = HTTPBearer()
 
-
 class CurrentUser:
     """
     Extracts and validates JWT token, returns the current user.
@@ -49,6 +48,19 @@ class CurrentUser:
                 detail="User account is inactive"
             )
         return user
+
+
+def verify_token(token: str):
+    """
+    Verify and decode JWT token.
+    
+    Args:
+        token: JWT token string
+        
+    Returns:
+        Decoded token payload if valid, None otherwise
+    """
+    return decode_jwt(token)
 
 
 async def get_current_user(current_user: CurrentUser = Depends()) -> User:

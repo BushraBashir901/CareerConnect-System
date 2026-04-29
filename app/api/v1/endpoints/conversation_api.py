@@ -45,7 +45,7 @@ async def get_conversation_history(
                 conversation_id=conv.conversation_id,
                 message_type=conv.message_type,
                 content=conv.content,
-                created_at=conv.created_at.isoformat(),
+                created_at=conv.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 session_id=conv.session_id
             )
             for conv in conversations
@@ -85,7 +85,7 @@ async def get_conversation_sessions(
             ConversationSession(
                 session_id=session["session_id"],
                 last_message=session["last_message"],
-                last_message_time=session["last_message_time"].isoformat(),
+                last_message_time=session["last_message_time"].strftime("%Y-%m-%d %H:%M:%S"),
                 last_message_type=session["last_message_type"]
             )
             for session in sessions

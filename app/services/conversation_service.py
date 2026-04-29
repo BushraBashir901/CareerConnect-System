@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from app.models.chatbot_conversation import ChatbotConversation
+from sqlalchemy import desc, text
+from app.models.chatbot_message import ChatMessage
 import json
 import uuid
 
@@ -16,7 +16,7 @@ class ConversationService:
                     message_type: str, 
                     content: str, 
                     session_id: Optional[str] = None,
-                    metadata: Optional[Dict[str, Any]] = None) -> ChatbotConversation:
+                    metadata: Optional[Dict[str, Any]] = None) -> ChatMessage:
         """
         Save a chat message to the database.
         
@@ -28,7 +28,7 @@ class ConversationService:
             metadata: Optional metadata as dictionary
             
         Returns:
-            Created ChatbotConversation record
+            Created ChatMessage record
         """
         # Generate session ID if not provided
         if not session_id:
@@ -37,12 +37,12 @@ class ConversationService:
         # Convert metadata to JSON string if provided
         metadata_json = json.dumps(metadata) if metadata else None
         
-        conversation = ChatbotConversation(
+        conversation = ChatMessage(
             user_id=user_id,
             message_type=message_type,
             content=content,
             session_id=session_id,
-            conservation_metadata=metadata_json
+            conversation_metadata=metadata_json
         )
         
         self.db.add(conversation)
@@ -54,7 +54,7 @@ class ConversationService:
     def get_conversation_history(self, 
                                user_id: int, 
                                session_id: Optional[str] = None,
-                               limit: int = 50) -> List[ChatbotConversation]:
+                               limit: int = 50) -> List[ChatMessage]:
         """
         Get conversation history for a user.
         
@@ -64,16 +64,16 @@ class ConversationService:
             limit: Maximum number of messages to return
             
         Returns:
-            List of ChatbotConversation records
+            List of ChatMessage records
         """
-        query = self.db.query(ChatbotConversation).filter(
-            ChatbotConversation.user_id == user_id
+        query = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id
         )
         
         if session_id:
-            query = query.filter(ChatbotConversation.session_id == session_id)
+            query = query.filter(ChatMessage.session_id == session_id)
         
-        return query.order_by(desc(ChatbotConversation.created_at)).limit(limit).all()
+        return query.order_by(desc(ChatMessage.created_at)).limit(limit).all()
     
     def get_recent_conversations(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """
@@ -87,17 +87,17 @@ class ConversationService:
             List of session dictionaries with session info
         """
         # Get unique session IDs with their latest message
-        result = self.db.execute(f"""
+        result = self.db.execute(text("""
             SELECT DISTINCT ON (session_id) 
                 session_id,
                 content as last_message,
                 created_at as last_message_time,
                 message_type
-            FROM chatbot_conversations 
-            WHERE user_id = {user_id}
+            FROM chat_messages
+            WHERE user_id = :user_id
             ORDER BY session_id, created_at DESC
-            LIMIT {limit}
-        """).fetchall()
+            LIMIT :limit
+        """), {"user_id": user_id, "limit": limit}).fetchall()
         
         sessions = []
         for row in result:
@@ -121,9 +121,9 @@ class ConversationService:
         Returns:
             True if deleted successfully, False otherwise
         """
-        deleted_count = self.db.query(ChatbotConversation).filter(
-            ChatbotConversation.user_id == user_id,
-            ChatbotConversation.session_id == session_id
+        deleted_count = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.session_id == session_id
         ).delete()
         
         self.db.commit()
@@ -139,22 +139,22 @@ class ConversationService:
         Returns:
             Dictionary with conversation statistics
         """
-        total_messages = self.db.query(ChatbotConversation).filter(
-            ChatbotConversation.user_id == user_id
+        total_messages = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id
         ).count()
         
-        total_sessions = self.db.query(ChatbotConversation.session_id).filter(
-            ChatbotConversation.user_id == user_id
+        total_sessions = self.db.query(ChatMessage.session_id).filter(
+            ChatMessage.user_id == user_id
         ).distinct().count()
         
-        user_messages = self.db.query(ChatbotConversation).filter(
-            ChatbotConversation.user_id == user_id,
-            ChatbotConversation.message_type == 'user'
+        user_messages = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.message_type == 'user'
         ).count()
         
-        bot_messages = self.db.query(ChatbotConversation).filter(
-            ChatbotConversation.user_id == user_id,
-            ChatbotConversation.message_type == 'bot'
+        bot_messages = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.message_type == 'bot'
         ).count()
         
         return {
@@ -170,7 +170,7 @@ class ConversationService:
                              user_message: str, 
                              bot_response: str,
                              session_id: Optional[str] = None,
-                             metadata: Optional[Dict[str, Any]] = None) -> tuple[ChatbotConversation, ChatbotConversation]:
+                             metadata: Optional[Dict[str, Any]] = None) -> tuple[ChatMessage, ChatMessage]:
         """
         Save both user message and bot response as a pair.
         

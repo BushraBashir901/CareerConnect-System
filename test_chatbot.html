@@ -139,6 +139,18 @@
         }
 
         function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addMessage('Already connected', false);
+                return;
+            }
+            
+            // Get your JWT token here - replace with your actual token
+            const JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwicm9sZSI6InJlY3J1aXRlciIsImV4cCI6MTc3NzQ0MDU3N30.EuNW23aVk9hnV64bEPNSfZ9mkdeXagbhA23XedZQdcM";
+            
+            
+            // Create WebSocket connection with token
+            const wsUrl = `ws://localhost:8000/api/v1/ws/chat?token=${JWT_TOKEN}`;
+            
             updateStatus('connecting', 'Connecting...');
             
             ws = new WebSocket(wsUrl);

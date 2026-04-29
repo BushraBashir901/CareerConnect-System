@@ -35,6 +35,6 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user")
 
     # One-to-One relationship with resume
-    chatbot_conversations = relationship("ChatbotConversation", back_populates="user")
+    chat_messages = relationship("ChatMessage", back_populates="user")
 
     user_resume = relationship("UserResume", back_populates="user", uselist=False)

@@ -8,7 +8,7 @@ from app.models.team_invitation import TeamInvitation
 from app.models.report import Report
 from app.models.interview import Interview
 from app.models.ai_bot import AiBot
-from app.models.chatbot_conversation import ChatbotConversation
+from app.models.chatbot_message import ChatMessage
 
 __all__ = [
     "User",
@@ -21,5 +21,5 @@ __all__ = [
     "Report",
     "Interview",
     "AiBot",
-    "ChatbotConversation",
+    "ChatMessage",
 ]

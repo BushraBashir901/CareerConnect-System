@@ -35,5 +35,7 @@ class Settings(BaseSettings):
     # Ollama Configuration
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "phi3"
-
+    
+    # OpenAI API Configuration
+    OPENAI_API_KEY: str
 settings = Settings()
