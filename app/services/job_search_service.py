@@ -1,18 +1,32 @@
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text, and_, or_
-from app.models.job import Job
+
 from app.models.user_resume import UserResume
+from app.repositories.chatbot_repo.job_search_repo import JobSearchRepository
 from app.services.embeddings_service import generate_embedding
+
+
+class UserResumeRepository:
+    """Small helper repo for resume data"""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_user_resume(self, user_id: int):
+        return self.db.query(UserResume).filter(
+            UserResume.user_id == user_id,
+            UserResume.embedding.isnot(None)
+        ).first()
 
 
 class JobSearchService:
     """
-    Service for advanced job search using semantic similarity and filtering.
+    Service: Business logic + AI + orchestration
     """
 
     def __init__(self, db: Session):
-        self.db = db
+        self.repo = JobSearchRepository(db)
+        self.resume_repo = UserResumeRepository(db)
 
     def search_jobs_by_text(
         self,
@@ -21,17 +35,12 @@ class JobSearchService:
         user_id: Optional[int] = None
     ) -> List[Dict[str, Any]]:
 
-        # 1. Generate query embedding
         query_embedding = generate_embedding(query)
 
-        # 2. Personalization using resume embedding (optional)
         if user_id:
-            user_resume = self.db.query(UserResume).filter(
-                UserResume.user_id == user_id,
-                UserResume.embedding.isnot(None)
-            ).first()
+            user_resume = self.resume_repo.get_user_resume(user_id)
 
-            if user_resume and user_resume.embedding:
+            if user_resume:
                 resume_embedding = list(user_resume.embedding)
 
                 query_embedding = [
@@ -39,139 +48,60 @@ class JobSearchService:
                     for q, r in zip(query_embedding, resume_embedding)
                 ]
 
-        # 3. Vector search query
-        sql_query = text("""
-            SELECT 
-                j.*,
-                c.company_name,
-                c.company_description,
-                1 - (j.embedding <=> CAST(:embedding AS vector)) as similarity_score
-            FROM jobs j
-            JOIN companies c ON j.company_id = c.company_id
-            WHERE j.embedding IS NOT NULL 
-            AND j.is_active = true
-            ORDER BY j.embedding <=> CAST(:embedding AS vector)
-            LIMIT :limit
-        """)
+        results = self.repo.search_jobs_by_embedding(query_embedding, limit)
 
-        results = self.db.execute(sql_query, {
-            "embedding": query_embedding,
-            "limit": limit
-        }).fetchall()
+        return self._format_jobs(results)
 
-        # 4. Format response
-        jobs = []
-        for row in results:
-            jobs.append({
-                "job_id": row.job_id,
-                "job_title": row.job_title,
-                "job_description": row.job_description,
-                "location": row.location,
-                "salary_range": row.salary_range,
-                "job_type": row.job_type,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-                "company_name": row.company_name,
-                "company_description": row.company_description,
-                "similarity_score": float(row.similarity_score)
-            })
+   
+    def search_similar_jobs(self, job_id: int, limit: int = 5):
 
-        return jobs
+        
+        job = self.resume_repo.db.query(UserResume).filter(
+            UserResume.job_id == job_id
+        ).first()
 
-    def search_similar_jobs(self, job_id: int, limit: int = 5) -> List[Dict[str, Any]]:
-
-        reference_job = self.db.query(Job).filter(Job.job_id == job_id).first()
-        if not reference_job or not reference_job.embedding:
+        if not job or not job.embedding:
             return []
 
-        embedding = list(reference_job.embedding)
+        results = self.repo.get_similar_jobs(
+            list(job.embedding),
+            job_id,
+            limit
+        )
 
-        sql_query = text("""
-            SELECT 
-                j.*,
-                c.company_name,
-                c.company_description,
-                1 - (j.embedding <=> CAST(:embedding AS vector)) as similarity_score
-            FROM jobs j
-            JOIN companies c ON j.company_id = c.company_id
-            WHERE j.embedding IS NOT NULL 
-            AND j.is_active = true
-            AND j.job_id != :job_id
-            ORDER BY j.embedding <=> CAST(:embedding AS vector)
-            LIMIT :limit
-        """)
+        return self._format_jobs(results)
 
-        results = self.db.execute(sql_query, {
-            "embedding": embedding,
-            "job_id": job_id,
-            "limit": limit
-        }).fetchall()
+    def get_jobs_by_location(self, location: str, limit: int = 20):
 
-        similar_jobs = []
-        for row in results:
-            similar_jobs.append({
-                "job_id": row.job_id,
-                "job_title": row.job_title,
-                "job_description": row.job_description,
-                "location": row.location,
-                "salary_range": row.salary_range,
-                "job_type": row.job_type,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-                "company_name": row.company_name,
-                "company_description": row.company_description,
-                "similarity_score": float(row.similarity_score)
-            })
+        results = self.repo.get_by_location(location, limit)
+        return self._format_jobs(results, similarity_fixed=True)
 
-        return similar_jobs
+    def get_jobs_by_type(self, job_type: str, limit: int = 20):
 
-    def get_jobs_by_location(self, location: str, limit: int = 20) -> List[Dict[str, Any]]:
+        results = self.repo.get_by_type(job_type, limit)
+        return self._format_jobs(results, similarity_fixed=True)
 
-        jobs = self.db.query(Job).join(Job.company).filter(
-            and_(
-                Job.is_active,
-                or_(
-                    Job.location.ilike(f"%{location}%"),
-                    Job.location.ilike(f"%{location.title()}%")
+  
+    def _format_jobs(self, results, similarity_fixed: bool = False):
+
+        return [
+            {
+                "job_id": r.job_id,
+                "job_title": r.job_title,
+                "job_description": r.job_description,
+                "location": r.location,
+                "salary_range": r.salary_range,
+                "job_type": r.job_type,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "company_name": r.company_name,
+                "company_description": r.company_description,
+                "similarity_score": float(
+                    getattr(
+                        r,
+                        "similarity_score",
+                        1.0 if similarity_fixed else 0.0
+                    )
                 )
-            )
-        ).limit(limit).all()
-
-        return [
-            {
-                "job_id": job.job_id,
-                "job_title": job.job_title,
-                "job_description": job.job_description,
-                "location": job.location,
-                "salary_range": job.salary_range,
-                "job_type": job.job_type,
-                "created_at": job.created_at.isoformat() if job.created_at else None,
-                "company_name": job.company.company_name if job.company else None,
-                "company_description": job.company.company_description if job.company else None,
-                "similarity_score": 1.0
             }
-            for job in jobs
-        ]
-
-    def get_jobs_by_type(self, job_type: str, limit: int = 20) -> List[Dict[str, Any]]:
-
-        jobs = self.db.query(Job).join(Job.company).filter(
-            and_(
-                Job.is_active,
-                Job.job_type.ilike(f"%{job_type}%")
-            )
-        ).limit(limit).all()
-
-        return [
-            {
-                "job_id": job.job_id,
-                "job_title": job.job_title,
-                "job_description": job.job_description,
-                "location": job.location,
-                "salary_range": job.salary_range,
-                "job_type": job.job_type,
-                "created_at": job.created_at.isoformat() if job.created_at else None,
-                "company_name": job.company.company_name if job.company else None,
-                "company_description": job.company.company_description if job.company else None,
-                "similarity_score": 1.0
-            }
-            for job in jobs
+            for r in results
         ]

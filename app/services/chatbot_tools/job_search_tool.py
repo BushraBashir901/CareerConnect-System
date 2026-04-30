@@ -7,6 +7,8 @@ class JobSearchTool:
     def __init__(self, job_search_service: JobSearchService):
         self.job_search_service = job_search_service
     
+    
+    # Search Jobs
     def search_jobs(self, query: str, user_id: Optional[int] = None, limit: int = 5) -> Dict[str, Any]:
         """
         Search for jobs using semantic similarity.
@@ -46,6 +48,7 @@ class JobSearchTool:
                 "jobs": []
             }
     
+    # Get Similar Jobs
     def get_similar_jobs(self, job_id: int, limit: int = 5) -> Dict[str, Any]:
         """
         Find jobs similar to a specific job.
@@ -80,6 +83,7 @@ class JobSearchTool:
                 "jobs": []
             }
     
+    # Search Jobs by Location
     def search_jobs_by_location(self, location: str, limit: int = 10) -> Dict[str, Any]:
         """
         Search for jobs in a specific location.
@@ -114,6 +118,7 @@ class JobSearchTool:
                 "jobs": []
             }
     
+    # Search Jobs by Type
     def search_jobs_by_type(self, job_type: str, limit: int = 10) -> Dict[str, Any]:
         """
         Search for jobs by type (full-time, part-time, contract, etc.).
@@ -147,6 +152,7 @@ class JobSearchTool:
                 "message": f"Error searching {job_type} positions: {str(e)}",
                 "jobs": []
             }
+
 
 def format_job_results(result: Dict[str, Any]) -> str:
     """

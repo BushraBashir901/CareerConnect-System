@@ -1,158 +1,312 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
+import uuid
+
 from app.core.dependency import get_db
-from app.services.conversation_service import ConversationService
 from app.dependencies.rbac_strict import get_current_user
 from app.models.user import User
+from app.services.conversation_service import ConversationService
 from app.schemas.conversation import ConversationMessage, ConversationSession, ConversationStats
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
+
+@router.post("/chat/start")
+async def start_chat(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new chat session and return WebSocket URL.
+    """
+
+    session_id = str(uuid.uuid4())
+
+    ws_url = f"/chat/ws?session_id={session_id}"
+
+    return {
+        "session_id": session_id,
+        "ws_url": ws_url
+    }
+
+
+
 @router.get("/history", response_model=List[ConversationMessage])
 async def get_conversation_history(
-    session_id: Optional[str] = Query(None),
-    limit: int = Query(50, le=200),
+    session_id: str = None,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Retrieve conversation history for the authenticated user.
-    
-    Args:
-        session_id: Optional session identifier to filter messages by specific conversation
-        limit: Maximum number of messages to return (default: 50, max: 200)
-        db: Database session dependency
-        current_user: Authenticated user from dependency injection
-        
-    Returns:
-        List[ConversationMessage]: List of conversation messages ordered by creation time
-        
-    Raises:
-        HTTPException: If there's an error retrieving conversation history
-    """
-    conversation_service = ConversationService(db)
-    
-    try:
-        conversations = conversation_service.get_conversation_history(
-            user_id=current_user.user_id,
-            session_id=session_id,
-            limit=limit
+    service = ConversationService(db)
+
+    conversations = service.get_conversation_history(
+        user_id=current_user.user_id,
+        session_id=session_id,
+        limit=limit
+    )
+
+    return [
+        ConversationMessage(
+            conversation_id=c.conversation_id,
+            message_type=c.message_type,
+            content=c.content,
+            created_at=c.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            session_id=c.session_id
         )
-        
-        return [
-            ConversationMessage(
-                conversation_id=conv.conversation_id,
-                message_type=conv.message_type,
-                content=conv.content,
-                created_at=conv.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                session_id=conv.session_id
-            )
-            for conv in conversations
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        for c in conversations
+    ]
+
+
 
 @router.get("/sessions", response_model=List[ConversationSession])
-async def get_conversation_sessions(
-    limit: int = Query(10, le=50),
+async def get_sessions(
+    limit: int = 10,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Retrieve recent conversation sessions for the authenticated user.
-    
-    Args:
-        limit: Maximum number of sessions to return (default: 10, max: 50)
-        db: Database session dependency
-        current_user: Authenticated user from dependency injection
-        
-    Returns:
-        List[ConversationSession]: List of recent conversation sessions with last message details
-        
-    Raises:
-        HTTPException: If there's an error retrieving conversation sessions
-    """
-    conversation_service = ConversationService(db)
-    
-    try:
-        sessions = conversation_service.get_recent_conversations(
-            user_id=current_user.user_id,
-            limit=limit
+    service = ConversationService(db)
+
+    sessions = service.get_recent_conversations(
+        user_id=current_user.user_id,
+        limit=limit
+    )
+
+    return [
+        ConversationSession(
+            session_id=s["session_id"],
+            last_message=s["last_message"],
+            last_message_time=s["last_message_time"].strftime("%Y-%m-%d %H:%M:%S"),
+            last_message_type=s["last_message_type"]
         )
-        
-        return [
-            ConversationSession(
-                session_id=session["session_id"],
-                last_message=session["last_message"],
-                last_message_time=session["last_message_time"].strftime("%Y-%m-%d %H:%M:%S"),
-                last_message_type=session["last_message_type"]
-            )
-            for session in sessions
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        for s in sessions
+    ]
+
+
 
 @router.get("/stats", response_model=ConversationStats)
-async def get_conversation_stats(
+async def get_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Retrieve conversation statistics for the authenticated user.
-    
-    Args:
-        db: Database session dependency
-        current_user: Authenticated user from dependency injection
-        
-    Returns:
-        ConversationStats: Statistics including total messages, sessions, and message type breakdown
-        
-    Raises:
-        HTTPException: If there's an error retrieving conversation statistics
-    """
-    conversation_service = ConversationService(db)
-    
-    try:
-        stats = conversation_service.get_conversation_stats(current_user.user_id)
-        
-        return ConversationStats(**stats)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    service = ConversationService(db)
+
+    stats = service.get_conversation_stats(current_user.user_id)
+    return ConversationStats(**stats)
+
 
 @router.delete("/sessions/{session_id}")
-async def delete_conversation_session(
+async def delete_session(
     session_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Delete an entire conversation session and all its messages.
+    service = ConversationService(db)
+
+    success = service.delete_conversation(
+        user_id=current_user.user_id,
+        session_id=session_id
+    )
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {"message": "Conversation session deleted successfully"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# from fastapi import APIRouter, Depends, HTTPException, Query
+# from sqlalchemy.orm import Session
+# from typing import List, Optional
+# from app.core.dependency import get_db
+# from app.services.conversation_service import ConversationService
+# from app.dependencies.rbac_strict import get_current_user
+# from app.models.user import User
+# from app.schemas.conversation import ConversationMessage, ConversationSession, ConversationStats
+
+# router = APIRouter(prefix="/conversations", tags=["Conversations"])
+
+# @router.get("/history", response_model=List[ConversationMessage])
+# async def get_conversation_history(
+#     session_id: Optional[str] = Query(None),
+#     limit: int = Query(50, le=200),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Retrieve conversation history for the authenticated user.
     
-    Args:
-        session_id: Unique identifier of the conversation session to delete
-        db: Database session dependency
-        current_user: Authenticated user from dependency injection
+#     Args:
+#         session_id: Optional session identifier to filter messages by specific conversation
+#         limit: Maximum number of messages to return (default: 50, max: 200)
+#         db: Database session dependency
+#         current_user: Authenticated user from dependency injection
         
-    Returns:
-        dict: Success message confirming deletion
+#     Returns:
+#         List[ConversationMessage]: List of conversation messages ordered by creation time
         
-    Raises:
-        HTTPException: If session not found (404) or there's an error during deletion (500)
-    """
-    conversation_service = ConversationService(db)
+#     Raises:
+#         HTTPException: If there's an error retrieving conversation history
+#     """
+#     conversation_service = ConversationService(db)
     
-    try:
-        success = conversation_service.delete_conversation(
-            user_id=current_user.user_id,
-            session_id=session_id
-        )
+#     try:
+#         conversations = conversation_service.get_conversation_history(
+#             user_id=current_user.user_id,
+#             session_id=session_id,
+#             limit=limit
+#         )
         
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
+#         return [
+#             ConversationMessage(
+#                 conversation_id=conv.conversation_id,
+#                 message_type=conv.message_type,
+#                 content=conv.content,
+#                 created_at=conv.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+#                 session_id=conv.session_id
+#             )
+#             for conv in conversations
+#         ]
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+# @router.get("/sessions", response_model=List[ConversationSession])
+# async def get_conversation_sessions(
+#     limit: int = Query(10, le=50),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Retrieve recent conversation sessions for the authenticated user.
+    
+#     Args:
+#         limit: Maximum number of sessions to return (default: 10, max: 50)
+#         db: Database session dependency
+#         current_user: Authenticated user from dependency injection
         
-        return {"message": "Conversation session deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#     Returns:
+#         List[ConversationSession]: List of recent conversation sessions with last message details
+        
+#     Raises:
+#         HTTPException: If there's an error retrieving conversation sessions
+#     """
+#     conversation_service = ConversationService(db)
+    
+#     try:
+#         sessions = conversation_service.get_recent_conversations(
+#             user_id=current_user.user_id,
+#             limit=limit
+#         )
+        
+#         return [
+#             ConversationSession(
+#                 session_id=session["session_id"],
+#                 last_message=session["last_message"],
+#                 last_message_time=session["last_message_time"].strftime("%Y-%m-%d %H:%M:%S"),
+#                 last_message_type=session["last_message_type"]
+#             )
+#             for session in sessions
+#         ]
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+# @router.get("/stats", response_model=ConversationStats)
+# async def get_conversation_stats(
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Retrieve conversation statistics for the authenticated user.
+    
+#     Args:
+#         db: Database session dependency
+#         current_user: Authenticated user from dependency injection
+        
+#     Returns:
+#         ConversationStats: Statistics including total messages, sessions, and message type breakdown
+        
+#     Raises:
+#         HTTPException: If there's an error retrieving conversation statistics
+#     """
+#     conversation_service = ConversationService(db)
+    
+#     try:
+#         stats = conversation_service.get_conversation_stats(current_user.user_id)
+        
+#         return ConversationStats(**stats)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+# @router.delete("/sessions/{session_id}")
+# async def delete_conversation_session(
+#     session_id: str,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Delete an entire conversation session and all its messages.
+    
+#     Args:
+#         session_id: Unique identifier of the conversation session to delete
+#         db: Database session dependency
+#         current_user: Authenticated user from dependency injection
+        
+#     Returns:
+#         dict: Success message confirming deletion
+        
+#     Raises:
+#         HTTPException: If session not found (404) or there's an error during deletion (500)
+#     """
+#     conversation_service = ConversationService(db)
+    
+#     try:
+#         success = conversation_service.delete_conversation(
+#             user_id=current_user.user_id,
+#             session_id=session_id
+#         )
+        
+#         if not success:
+#             raise HTTPException(status_code=404, detail="Session not found")
+        
+#         return {"message": "Conversation session deleted successfully"}
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
