@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.dependency import get_db
 from app.dependencies.rbac_strict import require_permission_with_company_scope
 from app.core.rbac import PermissionEnum
-from app.repositories import ai_bot_repo
-from app.schemas.ai_bot import AiBotCreate, AiBotUpdate, AiBotResponse
+from app.repositories import ai_bot_repo  # Removed - ai_bot functionality not needed
+from app.schemas.ai_bot import AiBotCreate, AiBotUpdate, AiBotResponse  # Removed - schema doesn't exist
 
 
 router = APIRouter(prefix="/ai-bot", tags=["AI Bots"])

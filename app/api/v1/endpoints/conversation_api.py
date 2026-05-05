@@ -8,6 +8,7 @@ from app.dependencies.rbac_strict import get_current_user
 from app.models.user import User
 from app.services.conversation_service import ConversationService
 from app.schemas.conversation import ConversationMessage, ConversationSession, ConversationStats
+from app.core.logger import logger
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
@@ -22,8 +23,14 @@ async def start_chat(
     """
 
     session_id = str(uuid.uuid4())
-
     ws_url = f"/chat/ws?session_id={session_id}"
+
+    logger.info("chat_session_started", 
+                extra={
+                    "user_id": current_user.id,
+                    "session_id": session_id,
+                    "endpoint": "/conversations/chat/start"
+                })
 
     return {
         "session_id": session_id,
@@ -41,13 +48,21 @@ async def get_conversation_history(
 ):
     service = ConversationService(db)
 
+    logger.info("conversation_history_requested", 
+                extra={
+                    "user_id": current_user.id,
+                    "session_id": session_id,
+                    "limit": limit,
+                    "endpoint": "/conversations/history"
+                })
+
     conversations = service.get_conversation_history(
         user_id=current_user.user_id,
         session_id=session_id,
         limit=limit
     )
 
-    return [
+    result = [
         ConversationMessage(
             conversation_id=c.conversation_id,
             message_type=c.message_type,
@@ -57,6 +72,15 @@ async def get_conversation_history(
         )
         for c in conversations
     ]
+
+    logger.info("conversation_history_returned", 
+                extra={
+                    "user_id": current_user.id,
+                    "session_id": session_id,
+                    "message_count": len(result)
+                })
+
+    return result
 
 
 
