@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .job_application import JobApplicationResponse
-from .ai_bot import AiBotResponse
 from .user import UserResponse
 
 
@@ -47,7 +46,7 @@ class InterviewResponse(InterviewBase):
     interview_id: int
     job_application: Optional[JobApplicationResponse] = None
     user: Optional[UserResponse] = None
-    ai_bot: Optional[AiBotResponse] = None
+    ai_bot: Optional[dict] = None
 
     model_config = {
         "from_attributes": True

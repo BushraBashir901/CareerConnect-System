@@ -6,7 +6,7 @@ import uuid
 from app.core.dependency import get_db
 from app.dependencies.rbac_strict import get_current_user
 from app.models.user import User
-from app.services.conversation_service import ConversationService
+from app.repositories.chatbot_repo.conversation_repo import ConversationRepository
 from app.schemas.conversation import ConversationMessage, ConversationSession, ConversationStats
 from app.core.logger import logger
 
@@ -27,7 +27,7 @@ async def start_chat(
 
     logger.info("chat_session_started", 
                 extra={
-                    "user_id": current_user.id,
+                    "user_id": current_user.user_id,
                     "session_id": session_id,
                     "endpoint": "/conversations/chat/start"
                 })
@@ -46,17 +46,17 @@ async def get_conversation_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    service = ConversationService(db)
+    repo = ConversationRepository(db)
 
     logger.info("conversation_history_requested", 
                 extra={
-                    "user_id": current_user.id,
+                    "user_id": current_user.user_id,
                     "session_id": session_id,
                     "limit": limit,
                     "endpoint": "/conversations/history"
                 })
 
-    conversations = service.get_conversation_history(
+    conversations = repo.get_conversation_history(
         user_id=current_user.user_id,
         session_id=session_id,
         limit=limit
@@ -75,7 +75,7 @@ async def get_conversation_history(
 
     logger.info("conversation_history_returned", 
                 extra={
-                    "user_id": current_user.id,
+                    "user_id": current_user.user_id,
                     "session_id": session_id,
                     "message_count": len(result)
                 })
@@ -90,9 +90,9 @@ async def get_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    service = ConversationService(db)
+    repo = ConversationRepository(db)
 
-    sessions = service.get_recent_conversations(
+    sessions = repo.get_recent_conversations(
         user_id=current_user.user_id,
         limit=limit
     )
@@ -114,9 +114,13 @@ async def get_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    service = ConversationService(db)
+    repo = ConversationRepository(db)
 
-    stats = service.get_conversation_stats(current_user.user_id)
+    stats = {
+        "total_messages": repo.count_messages(current_user.user_id),
+        "user_messages": repo.count_by_role(current_user.user_id, "user"),
+        "assistant_messages": repo.count_by_role(current_user.user_id, "assistant")
+    }
     return ConversationStats(**stats)
 
 
@@ -126,9 +130,9 @@ async def delete_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    service = ConversationService(db)
+    repo = ConversationRepository(db)
 
-    success = service.delete_conversation(
+    success = repo.delete_conversation(
         user_id=current_user.user_id,
         session_id=session_id
     )

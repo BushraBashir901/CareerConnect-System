@@ -2,7 +2,6 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .user import UserResponse
-from .ai_bot import AiBotResponse
 from .company import CompanyResponse
 
 
@@ -49,7 +48,7 @@ class ReportResponse(ReportBase):
     created_at: datetime
     updated_at: Optional[datetime]
     user: Optional[UserResponse] = None
-    bot: Optional[AiBotResponse] = None
+    bot: Optional[dict] = None
     company: Optional[CompanyResponse] = None
 
     model_config = {

@@ -18,7 +18,7 @@ class ChatMessage(Base):
     
     # Optional metadata
     session_id = Column(String(255), nullable=True)  
-    conversation_metadata = Column(Text, nullable=True)  
+     
 
     user = relationship("User", back_populates="chat_messages")
 
