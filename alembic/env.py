@@ -14,6 +14,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Use application settings so Alembic shares the same DATABASE_URL
+from app.core.config import settings
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
 # Import your Base and models
 from app.db.base_class import Base
 from app.models import *

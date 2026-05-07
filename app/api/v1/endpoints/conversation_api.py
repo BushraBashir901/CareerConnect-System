@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
 @router.post("/chat/start")
 async def start_chat(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -23,7 +24,7 @@ async def start_chat(
     """
 
     session_id = str(uuid.uuid4())
-    ws_url = f"/chat/ws?session_id={session_id}"
+    ws_url = str(request.url_for("chat_socket")).replace("http://", "ws://") + f"?session_id={session_id}"
 
     logger.info("chat_session_started", 
                 extra={

@@ -1,5 +1,9 @@
 """
-Chatbot orchestrator service for coordinating all chatbot components.
+Chatbot Orchestrator (Production-Ready Step 03)
+- Redis memory (recent messages + summary)
+- Tool routing
+- LLM processing
+- Background summarization trigger
 """
 
 import time
@@ -8,85 +12,92 @@ from typing import Dict, Any, Optional
 from enum import Enum
 
 from app.schemas.conversation import ChatRequest, ChatResponse
-from app.schemas.rag import RetrievalRequest
 from app.services.llm_service import LLMService
-from app.services.retriever_service import RetrieverService
-from app.services.memory_manager import MemoryManager
 from app.tools.registry import get_tool_registry
 from app.repositories.chatbot_repo.conversation_repo import ConversationRepository
-
 from app.db.session import SessionLocal
-from app.core.logger import logger
 
+from app.core.logger import logger
 from app.prompts.system import SYSTEM_PROMPT
 from app.prompts.tool_formatting import format_tool_prompt
+from task.summarization_worker import summarize_conversation
 
 
+from app.services.memory_service import (
+    add_message,
+    get_recent_messages,
+    get_summary,
+    should_summarize,
+    reset_memory,
+    set_summary
+)
+
+
+# MODE ENUM
 class ProcessingMode(Enum):
     DIRECT_LLM = "direct_llm"
     TOOL_EXECUTION = "tool_execution"
 
-
+# ORCHESTRATOR
 class ChatbotOrchestrator:
 
     def __init__(self, llm_service: LLMService, conversation_repo: ConversationRepository):
         self.llm_service = llm_service
         self.conversation_repo = conversation_repo
         self.tool_registry = get_tool_registry()
-        self.retriever_service = RetrieverService()
-        self.memory_manager = MemoryManager()
-
         self.system_prompt = SYSTEM_PROMPT
 
+    
+# MAIN ENTRY
     async def process_message(self, request: ChatRequest) -> ChatResponse:
         start_time = time.time()
 
         logger.info("message_processing_start", extra={
             "user_id": request.user_id,
-            "session_id": request.session_id,
-            "message": request.message
+            "session_id": request.session_id
         })
 
         try:
-            # Save user message
-            self.conversation_repo.save_message(
-                user_id=request.user_id,
-                message_type="user",
-                content=request.message,
-                session_id=request.session_id
+            # 1. STORE USER MESSAGE (Redis)
+            add_message(request.session_id, "user", request.message)
+
+            # 2. FETCH CONTEXT (Redis)
+            recent_messages = get_recent_messages(request.session_id)
+            summary = get_summary(request.session_id)
+
+            
+            # 3. ROUTING (tool vs LLM)
+            mode, tool_name = await self._determine_processing_mode_and_tool(
+                request.message
             )
 
-            # Decide mode + tool
-            mode, tool_name = await self._determine_processing_mode_and_tool(request.message)
-
-            logger.info("processing_mode_selected", extra={
-                "mode": mode.value,
-                "tool": tool_name
-            })
-
-            # Execute pipeline
             if mode == ProcessingMode.TOOL_EXECUTION:
-                result = await self._process_with_tools(request, tool_name)
+                result = await self._process_with_tools(
+                    request, tool_name, recent_messages, summary
+                )
             else:
-                result = await self._process_direct_llm(request)
+                result = await self._process_direct_llm(
+                    request, recent_messages, summary
+                )
 
-            # Save assistant message
-            self.conversation_repo.save_message(
-                user_id=request.user_id,
-                message_type="assistant",
-                content=result["text"],
-                session_id=request.session_id
-            )
+          
+            # 4. STORE ASSISTANT MESSAGE (Redis)
+            add_message(request.session_id, "assistant", result["text"])
 
-            processing_time = time.time() - start_time
+          
+            # 5. TRIGGER SUMMARIZATION (async)
+            if should_summarize(request.session_id):
+                summarize_conversation.delay(session_id=request.session_id)
 
+           
+            # 6. RESPONSE
             return ChatResponse(
                 response=result["text"],
-                session_id=request.session_id or "default",
+                session_id=request.session_id,
                 timestamp=time.time(),
                 metadata={
-                    "processing_mode": mode.value,
-                    "processing_time": processing_time,
+                    "processing_time": time.time() - start_time,
+                    "mode": mode.value,
                     "tools_used": result.get("tools_used", [])
                 }
             )
@@ -95,17 +106,17 @@ class ChatbotOrchestrator:
             logger.error("chat_error", extra={"error": str(e)})
 
             return ChatResponse(
-                response="I encountered an error while processing your request.",
-                session_id=request.session_id or "default",
+                response="Sorry, I encountered an error while processing your request.",
+                session_id=request.session_id,
                 timestamp=time.time(),
                 metadata={"error": str(e)}
             )
 
-    # ---------------------------
-    # ROUTING LOGIC
-    # ---------------------------
 
-    async def _determine_processing_mode_and_tool(self, message: str) -> tuple[ProcessingMode, Optional[str]]:
+# ROUTING LOGIC
+    async def _determine_processing_mode_and_tool(
+        self, message: str
+    ) -> tuple[ProcessingMode, Optional[str]]:
 
         msg = message.lower()
 
@@ -121,38 +132,40 @@ class ChatbotOrchestrator:
                 return ProcessingMode.TOOL_EXECUTION, tool
 
         return ProcessingMode.DIRECT_LLM, None
-
-    # ---------------------------
-    # TOOL EXECUTION
-    # ---------------------------
-
-    async def _process_with_tools(self, request: ChatRequest, tool_name: Optional[str]) -> Dict[str, Any]:
+    
+# TOOL PIPELINE
+    async def _process_with_tools(
+        self,
+        request: ChatRequest,
+        tool_name: Optional[str],
+        recent_messages,
+        summary
+    ) -> Dict[str, Any]:
 
         if not tool_name:
-            return await self._process_direct_llm(request)
+            return await self._process_direct_llm(request, recent_messages, summary)
 
         tool = self.tool_registry.get_tool(tool_name)
 
         if not tool:
-            return await self._process_direct_llm(request)
+            return await self._process_direct_llm(request, recent_messages, summary)
 
-        parameters = await self._extract_tool_parameters(request.message, tool)
+        params = await self._extract_tool_parameters(request.message, tool)
 
         tool_response = await tool.execute({
             "tool_name": tool_name,
-            "parameters": parameters,
+            "parameters": params,
             "user_id": request.user_id,
             "session_id": request.session_id
         })
 
         if not tool_response.success:
-            return await self._process_direct_llm(request)
+            return await self._process_direct_llm(request, recent_messages, summary)
 
-        
         prompt = format_tool_prompt(
             tool_response.result,
             request.message,
-            ""
+            summary or ""
         )
 
         response = await self.llm_service.generate(
@@ -165,15 +178,25 @@ class ChatbotOrchestrator:
             "tools_used": [tool_name]
         }
 
-    # ---------------------------
-    # DIRECT LLM
-    # ---------------------------
+    # =========================================================
+    # DIRECT LLM PIPELINE
+    # =========================================================
+    async def _process_direct_llm(
+        self,
+        request: ChatRequest,
+        recent_messages,
+        summary
+    ) -> Dict[str, Any]:
 
-    async def _process_direct_llm(self, request: ChatRequest) -> Dict[str, Any]:
+        prompt = self._build_prompt(
+            request.message,
+            recent_messages,
+            summary
+        )
 
         response = await self.llm_service.generate(
             system_prompt=self.system_prompt,
-            user_prompt=request.message
+            user_prompt=prompt
         )
 
         return {
@@ -181,38 +204,68 @@ class ChatbotOrchestrator:
             "tools_used": []
         }
 
-    # ---------------------------
-    # TOOL PARAM EXTRACTION
-    # ---------------------------
+    # =========================================================
+    # PROMPT BUILDER
+    # =========================================================
+    def _build_prompt(self, message, recent_messages, summary):
 
+        prompt = "You are an AI assistant.\n\n"
+
+        if summary:
+            prompt += f"Conversation Summary:\n{summary}\n\n"
+
+        if recent_messages:
+            prompt += "Recent Conversation:\n"
+            for msg in recent_messages:
+                prompt += f"{msg}\n"
+
+        prompt += f"\nUser Message:\n{message}"
+
+        return prompt
+
+    # =========================================================
+    # TOOL PARAM EXTRACTION
+    # =========================================================
     async def _extract_tool_parameters(self, message: str, tool) -> Dict[str, Any]:
 
-        msg = message.lower()
-        params = {}
-
         if tool.name == "job_search":
-            params["query"] = message
+            return {"query": message}
 
-        elif tool.name == "career_advice":
-            params["topic"] = message
+        if tool.name == "career_advice":
+            return {"topic": message}
 
-        return params
+        return {}
 
-    # ---------------------------
-    # STATS
-    # ---------------------------
+    # =========================================================
+    # SUMMARIZATION WORKER (ASYNC)
+    # =========================================================
+    async def _trigger_summarization(self, session_id: str):
 
-    def get_stats(self) -> Dict[str, Any]:
-        return {
-            "tools": self.tool_registry.get_tool_names(),
-            "memory": self.memory_manager.get_stats()
-        }
+        try:
+            messages = get_recent_messages(session_id)
+
+            summary = await self.llm_service.generate(
+                system_prompt="Summarize this conversation briefly.",
+                user_prompt=str(messages)
+            )
+
+            set_summary(session_id, summary)
+            reset_memory(session_id)
+
+            logger.info("conversation_summarized", extra={
+                "session_id": session_id
+            })
+
+        except Exception as e:
+            logger.error("summarization_error", extra={
+                "session_id": session_id,
+                "error": str(e)
+            })
 
 
-# ---------------------------
-# SINGLETON
-# ---------------------------
-
+# =========================================================
+# SINGLETON ORCHESTRATOR
+# =========================================================
 _global_orchestrator = None
 _orchestrator_lock = asyncio.Lock()
 
@@ -222,7 +275,6 @@ async def get_global_orchestrator():
 
     async with _orchestrator_lock:
         if _global_orchestrator is None:
-
             db = SessionLocal()
             repo = ConversationRepository(db)
 

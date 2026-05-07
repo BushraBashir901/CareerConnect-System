@@ -17,6 +17,5 @@ router.include_router(auth_api.router)
 router.include_router(team_api.router)
 router.include_router(team_invitation_api.router)
 router.include_router(conversation_api.router)
-router.include_router(chat_ws_api.router)
 
 

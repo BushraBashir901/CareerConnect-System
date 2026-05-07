@@ -9,7 +9,7 @@ from app.core.logger import logger
 router = APIRouter()
 
 
-@router.websocket("/chat/ws")
+@router.websocket("/chat")
 async def chat_socket(
     websocket: WebSocket,
     token: str = Query(...),
