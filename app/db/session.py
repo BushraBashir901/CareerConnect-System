@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.db.base_class import Base
 from app.core.config import settings
 
 # Create the SQLAlchemy engine

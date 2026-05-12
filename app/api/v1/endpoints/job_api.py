@@ -37,9 +37,6 @@ from app.utils.filtering import(
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 
-# -------------------------
-# Create Job
-# -------------------------
 @router.post("/", response_model=JobResponse)
 def create_job(
     job: JobCreate,
@@ -65,9 +62,6 @@ def create_job(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# -------------------------
-# Get Job by ID
-# -------------------------
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(
     job_id: int,
@@ -96,9 +90,6 @@ def get_job(
     return job
 
 
-# -------------------------
-# List All Jobs
-# -------------------------
 @router.get("/", response_model=PaginatedResponse[JobResponse])
 def list_jobs(
     pagination: PaginationParams = Depends(),
@@ -182,9 +173,6 @@ def list_jobs(
     )
 
 
-# -------------------------
-# Update Job
-# -------------------------
 @router.put("/{job_id}", response_model=JobResponse)
 def update_job(
     job_id: int,
@@ -221,9 +209,6 @@ def update_job(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# -------------------------
-# Delete Job
-# -------------------------
 @router.delete("/{job_id}", response_model=JobResponse)
 def delete_job(
     job_id: int,

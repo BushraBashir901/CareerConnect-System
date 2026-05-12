@@ -1,10 +1,14 @@
-def messages_key(session_id: str):
-    return f"chat:{session_id}:messages"
+def messages_key(user_id: str, session_id: str):
+    return f"user:{user_id}:session:{session_id}:messages"
 
 
-def summary_key(session_id: str):
-    return f"chat:{session_id}:summary"
+def summary_key(user_id: str, session_id: str):
+    return f"user:{user_id}:session:{session_id}:summary"
 
 
-def count_key(session_id: str):
-    return f"chat:{session_id}:count"
+def count_key(user_id: str, session_id: str):
+    return f"user:{user_id}:session:{session_id}:count"
+
+
+def session_key(user_id: str, session_id: str):
+    return f"user:{user_id}:session:{session_id}:info"

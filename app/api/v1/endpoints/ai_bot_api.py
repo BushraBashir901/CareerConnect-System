@@ -11,9 +11,6 @@ from app.schemas.ai_bot import AiBotCreate, AiBotUpdate, AiBotResponse  # Remove
 router = APIRouter(prefix="/ai-bot", tags=["AI Bots"])
 
 
-# -------------------------
-# Create AI Bot
-# -------------------------
 @router.post("/", response_model=AiBotResponse)
 def create_ai_bot(
     bot: AiBotCreate,
@@ -39,9 +36,6 @@ def create_ai_bot(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# -------------------------
-# Get AI Bot by ID
-# -------------------------
 @router.get("/{bot_id}", response_model=AiBotResponse)
 def get_ai_bot(
     bot_id: int,
@@ -70,9 +64,6 @@ def get_ai_bot(
     return ai_bot
 
 
-# -------------------------
-# Update AI Bot
-# -------------------------
 @router.put("/{bot_id}", response_model=AiBotResponse)
 def update_ai_bot(
     bot_id: int,
@@ -103,9 +94,6 @@ def update_ai_bot(
     return ai_bot
 
 
-# -------------------------
-# Delete AI Bot
-# -------------------------
 @router.delete("/{bot_id}", response_model=AiBotResponse)
 def delete_ai_bot(
     bot_id: int,
@@ -134,9 +122,6 @@ def delete_ai_bot(
     return ai_bot
 
 
-# -------------------------
-# List all AI Bots
-# -------------------------
 @router.get("/", response_model=list[AiBotResponse])
 def list_ai_bots(
     current_user=Depends(require_permission_with_company_scope(PermissionEnum.RUN_AI_EVALUATION)),

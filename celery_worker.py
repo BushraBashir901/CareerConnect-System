@@ -1,4 +1,3 @@
-
 from celery import Celery
 from app.core.config import settings
 
@@ -30,6 +29,7 @@ celery_app.conf.update(
 # Import task modules directly to register them
 from task import cv_parsing_task
 from task import send_email_invitation_task
+from task import message_batch_worker
 
 print("Task modules imported and registered!")
 

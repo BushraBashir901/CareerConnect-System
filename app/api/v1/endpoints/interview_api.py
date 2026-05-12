@@ -18,9 +18,6 @@ router = APIRouter(
 )
 
 
-# -------------------------
-# Create
-# -------------------------
 @router.post("/", response_model=InterviewResponse)
 def create_interview(
     data: InterviewCreate,
@@ -49,9 +46,6 @@ def create_interview(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# -------------------------
-# Get
-# -------------------------
 @router.get("/{bot_id}/{user_id}", response_model=InterviewResponse)
 def get_interview(
     bot_id: int,
@@ -84,9 +78,6 @@ def get_interview(
     return obj
 
 
-# -------------------------
-# Update
-# -------------------------
 @router.put("/{bot_id}/{user_id}", response_model=InterviewResponse)
 def update_interview(
     bot_id: int,
@@ -125,9 +116,6 @@ def update_interview(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# -------------------------
-# Delete
-# -------------------------
 @router.delete("/{bot_id}/{user_id}", response_model=InterviewResponse)
 def delete_interview(
     bot_id: int,
@@ -160,9 +148,6 @@ def delete_interview(
     return obj
 
 
-# -------------------------
-# List
-# -------------------------
 @router.get("/", response_model=list[InterviewResponse])
 def list_interviews(
     current_user=Depends(require_permission_with_company_scope(PermissionEnum.VIEW_INTERVIEWS)),
