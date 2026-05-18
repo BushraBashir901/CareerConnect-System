@@ -30,6 +30,7 @@ celery_app.conf.update(
 from task import cv_parsing_task
 from task import send_email_invitation_task
 from task import message_batch_worker
+from task import summarization_worker
 
 print("Task modules imported and registered!")
 

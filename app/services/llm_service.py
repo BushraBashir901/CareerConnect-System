@@ -1,12 +1,51 @@
 from typing import List, Dict, Optional
 from app.core.llm_client import client
+from app.core.config import settings
 
 
 class LLMService:
 
     def __init__(self):
         self.client = client
+        self.model = settings.OPENAI_API_KEY
 
+    # -----------------------------
+    # CORE CALL (NO DUPLICATION)
+    # -----------------------------
+    def _create_completion(self, messages: List[Dict]):
+
+        return self.client.chat.completions.create(
+            model=self.model,
+            messages=messages
+        )
+
+    # -----------------------------
+    # MESSAGE BUILDER
+    # -----------------------------
+    def _build_messages(
+        self,
+        system_prompt: str,
+        messages: Optional[List[Dict]] = None,
+        user_prompt: Optional[str] = None
+    ):
+
+        final_messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        if messages:
+            final_messages.extend(self._sanitize_messages(messages))
+
+        if user_prompt:
+            final_messages.append(
+                {"role": "user", "content": user_prompt}
+            )
+
+        return final_messages
+
+    # -----------------------------
+    # ASYNC (FASTAPI)
+    # -----------------------------
     async def generate(
         self,
         system_prompt: str,
@@ -14,52 +53,50 @@ class LLMService:
         user_prompt: Optional[str] = None
     ) -> str:
 
-        try:
-           
-            final_messages = []
+        final_messages = self._build_messages(
+            system_prompt,
+            messages,
+            user_prompt
+        )
 
-            # system prompt always first
-            final_messages.append({
-                "role": "system",
-                "content": system_prompt
-            })
+        response = self._create_completion(final_messages)
 
-            # history/messages
-            if messages:
-                final_messages.extend(self._sanitize_messages(messages))
+        return response.choices[0].message.content
 
-            # fallback user prompt (if not using full messages flow)
-            if user_prompt:
-                final_messages.append({
-                    "role": "user",
-                    "content": user_prompt
-                })
+    # -----------------------------
+    # SYNC (CELERY)
+    # -----------------------------
+    def generate_sync(
+        self,
+        system_prompt: str,
+        user_prompt: str
+    ) -> str:
 
-        
-            response = self.client.chat.completions.create(
-                model="gpt-5-nano",
-                messages=final_messages
-            )
+        final_messages = self._build_messages(
+            system_prompt,
+            user_prompt=user_prompt
+        )
 
-            return response.choices[0].message.content
+        response = self._create_completion(final_messages)
 
-        except Exception as e:
-            return f"LLM Error: {str(e)}"
+        return response.choices[0].message.content
 
- 
+    # -----------------------------
+    # SANITIZER
+    # -----------------------------
     def _sanitize_messages(self, messages: List[Dict]) -> List[Dict]:
-        clean = []
 
-        for msg in messages:
-            if not isinstance(msg, dict):
+        clean_messages = []
+
+        for m in messages:
+            if not isinstance(m, dict):
+                continue
+            if "role" not in m or "content" not in m:
                 continue
 
-            if "role" not in msg or "content" not in msg:
-                continue
-
-            clean.append({
-                "role": msg["role"],
-                "content": str(msg["content"])
+            clean_messages.append({
+                "role": m["role"],
+                "content": str(m["content"])
             })
 
-        return clean
+        return clean_messages

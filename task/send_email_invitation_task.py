@@ -2,6 +2,7 @@ from app.services.email_service import email_service
 from datetime import datetime
 from celery_worker import celery_app
 import dotenv
+
 dotenv.load_dotenv()
 
 @celery_app.task(name="send_team_invitation_email")

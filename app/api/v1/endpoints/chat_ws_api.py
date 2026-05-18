@@ -6,8 +6,10 @@ from app.models.user import User
 from app.schemas.conversation import ChatRequest
 from app.core.logger import logger
 
-router = APIRouter()
+from app.core.ai.intent_router import Intent,IntentRouter
 
+router = APIRouter()
+intent_router = IntentRouter()
 
 @router.websocket("/chat")
 async def chat_socket(
@@ -62,7 +64,7 @@ async def chat_socket(
                        "user_id": user_id,
                        "session_id": session_id
                    })
-
+        
         # -------------------------
         # 2. ORCHESTRATOR
         # -------------------------
@@ -81,6 +83,16 @@ async def chat_socket(
                                "session_id": session_id,
                                "message_length": len(user_message)
                            })
+                intent, confidence = intent_router.classify_with_log(user_message)
+                if intent == Intent.GREETING:
+                    response_text = "Hey 👋 How can I help you today?"
+                    await websocket.send_text(response_text)
+                    continue
+
+                if intent == Intent.SMALL_TALK:
+                    response_text = "👍"
+                    await websocket.send_text(response_text)
+                    continue
 
                 chat_request = ChatRequest(
                     message=user_message,
@@ -89,26 +101,34 @@ async def chat_socket(
                 )
 
                 response = await orchestrator.process_message(
-                    request=chat_request
+                    request=chat_request,
+                    intent=intent,
+                    confidence=confidence
                 )
 
-                logger.info("websocket_response_sent", 
-                           extra={
-                               "user_id": user_id,
-                               "session_id": session_id,
-                               "response_length": len(response.response),
-                               "response_time": response.metadata.get("processing_time", 0)
-                           })
+                logger.info("websocket_response_sent",
+                extra={
+                "user_id": user_id,
+                "session_id": session_id,
+                "response_length": len(response.response),
+                "response_time": response.metadata.get("processing_time", 0),
+                "intent": intent.value,
+                "confidence": confidence
+                }
+                )
+
 
                 await websocket.send_text(response.response)
 
+
             except WebSocketDisconnect:
-                logger.info("websocket_disconnect", 
-                           extra={
-                               "user_id": user_id,
-                               "session_id": session_id,
-                               "reason": "normal_disconnect"
-                           })
+                logger.info("websocket_disconnect",
+                 extra={
+                "user_id": user_id,
+                "session_id": session_id,
+                "reason": "normal_disconnect"
+                }
+                )
                 break
                 
             except Exception as e:

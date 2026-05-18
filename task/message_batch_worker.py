@@ -6,9 +6,8 @@ from app.repositories.chatbot_repo.conversation_repo import ConversationReposito
 
 @celery_app.task
 def save_messages_batch(user_id: int, session_id: str, messages: List[Dict[str, Any]]) -> bool:
-
+    
     db = SessionLocal()
-
     try:
         repo = ConversationRepository(db)
 
